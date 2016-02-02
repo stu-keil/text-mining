@@ -9,5 +9,5 @@ python singular.py <Palabra_Plural>
 
 Para obtener las matrices de frecuencias 
 ```python
-python matrices_corpus JSON_CORPUS
+python matrices_corpus.py JSON_CORPUS
 ```
