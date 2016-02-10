@@ -13,25 +13,30 @@ from pprint import pprint
 import os as os
 import io as io
 import sys
+from collections import defaultdict
+from pickle import dump
 
 #os.getcwd()
-#os.chdir('/home/stuka/itam2/textmining')
+#os.chdir('/home/stuka/itam2/textmining/text-mining')
 #os.listdir('.')
 
 """Metodos de la clase"""
     
 """Recalculo de probabilidades por columna"""
-def normaliza_columnas_matriz(df_input):
-    #print(df_input)
-    for i in range(len(df_input.columns)):
-        col_sum = df_input[df_input.columns[i]].sum(axis=0)
-        #print(col_sum)
-        col_sum = col_sum*1.0
-        #print(col_sum)
-        for j in range(len(df_input.index)):
-            df_input.iloc[j,i] = df_input.iloc[j,i]/col_sum
-    return(df_input)
-    
+def probabilidades_smoothing(matrix,l=1.0):
+    col_sum = matrix.sum(axis=0)+matrix.shape[0]*l
+    for i in range(matrix.shape[1]):
+        for j in range(matrix.shape[0]):
+            matrix[j,i] = (matrix[j,i]+l)/col_sum[i]
+    return(matrix)
+
+  
+def dictionario(label_list):
+    dict = defaultdict()
+    dict.default_factory = lambda: len(dict)
+    [dict[w] for w in label_list]
+    return(dict)
+ 
 
 def generaMatrices(filename='jsonCorpus2.txt'):
     
@@ -74,52 +79,53 @@ def generaMatrices(filename='jsonCorpus2.txt'):
                 tags.append(data["doc"][i]["document"][j]["tag"])
             if(data["doc"][i]["document"][j]["token"] not in tokens):
                 tokens.append(data["doc"][i]["document"][j]["token"])
-    
+   
+    tag_init = u'|INIT|'
+    tags.append(tag_init)
+    tags = dictionario(tags)
+    tokens = dictionario(tokens)
+   
     
     #len(tokens)
     #len(tags)
     print("Creacion de la matriz token tags")
-    df = pd.DataFrame(columns = tokens, index = tags)
-    df = df.fillna(0)
+    MB = np.zeros((len(tags),len(tokens)))
     
     for i in range(len(data["doc"])):
         for j in range(len(data["doc"][i]["document"])):
            tag = data["doc"][i]["document"][j]["tag"]
            token = data["doc"][i]["document"][j]["token"]
-           df.loc[tag,token] = df.loc[tag,token]+1
-    df = normaliza_columnas_matriz(df)      
+           MB[tags[tag],tokens[token]] += 1
+    
+    MB = probabilidades_smoothing(MB)      
     
     print("Generación de la Matriz de transiciones")
     
-    tag_init = u'|INIT|'
-    tags.append(tag_init)
     
-    dfA = pd.DataFrame(columns = tags, index = tags)
-    dfA = dfA.fillna(0)
-    dfA
+    MA = np.zeros((len(tags),len(tags)))
     
     for i in range(len(data["doc"])):
         for j in range(len(data["doc"][i]["document"])):
-           tag_next = data["doc"][i]["document"][j]["tag"]
+           tag = data["doc"][i]["document"][j]["tag"]
            if(j-1<0):
-               tag = tag_init
+               tag_1 = tag_init
            else:
-               tag = data["doc"][i]["document"][j-1]["tag"]
-           dfA.loc[tag_next,tag] = dfA.loc[tag_next,tag] + 1
+               tag_1 = data["doc"][i]["document"][j-1]["tag"]
+           MA[tags[tag],tags[tag_1]] += 1
            
-    #dfA.loc[tag_init,tag_init] = 1
-    dfA = normaliza_columnas_matriz(dfA)
+    MA = probabilidades_smoothing(MA)
     
     print("Generacion de Iniciales")
-    dfInits = pd.DataFrame(columns = [u'|INIT|'], index = tags)
-    dfInits = dfInits.fillna(0)
+    MPInits = np.zeros((len(tags),1))
     
     for i in range(len(data["doc"])):
            tag_inicio = data["doc"][i]["document"][0]["tag"]
-           dfInits.loc[tag_inicio,u'|INIT|'] = dfInits.loc[tag_inicio,u'|INIT|'] + 1
-    dfInits = normaliza_columnas_matriz(dfInits) 
-    print("Devuelve tres dataframes")
-    return(df,dfA,dfInits)
+           MPInits[tags[tag_inicio],0] +=  1
+    
+    
+    MPInits = probabilidades_smoothing(MPInits) 
+    print("Devuelve tres matrices y dos diccionarios")
+    return(MA,MB,MPInits,tags,tokens)
 
 
 
@@ -130,5 +136,8 @@ if total != 2:
     sys.exit(2)
     
 else:    
-    result = generaMatrices(str(sys.argv[1]))
-    print "Las matrices finales son", result
+    A,B,Pi,tags,tokens = generaMatrices(str(sys.argv[1]))
+    out = open('HMM.p','w')
+    HMM = [A,B,Pi,dict(tags),dict(tokens)]
+    dump(HMM,out)
+    print "Las matrices finales son", A,B,Pi,
