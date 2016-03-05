@@ -97,12 +97,13 @@ def generaMatrices(filename='jsonCorpus2.txt'):
            token = data["doc"][i]["document"][j]["token"]
            MB[tags[tag],tokens[token]] += 1
     
-    MB = probabilidades_smoothing(MB)      
+    MB = probabilidades_smoothing(MB,0.5)      
     
     print("Generación de la Matriz de transiciones")
     
     
     MA = np.zeros((len(tags),len(tags)))
+    
     
     for i in range(len(data["doc"])):
         for j in range(len(data["doc"][i]["document"])):
@@ -112,8 +113,8 @@ def generaMatrices(filename='jsonCorpus2.txt'):
            else:
                tag_1 = data["doc"][i]["document"][j-1]["tag"]
            MA[tags[tag],tags[tag_1]] += 1
-           
-    MA = probabilidades_smoothing(MA)
+
+    MA = probabilidades_smoothing(MA,0.5)
     
     print("Generacion de Iniciales")
     MPInits = np.zeros((len(tags),1))
@@ -123,7 +124,7 @@ def generaMatrices(filename='jsonCorpus2.txt'):
            MPInits[tags[tag_inicio],0] +=  1
     
     
-    MPInits = probabilidades_smoothing(MPInits) 
+    MPInits = probabilidades_smoothing(MPInits,0.5) 
     print("Devuelve tres matrices y dos diccionarios")
     return(MA,MB,MPInits,tags,tokens)
 
