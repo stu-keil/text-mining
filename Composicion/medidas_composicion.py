@@ -13,6 +13,7 @@ import os
 import io
 import re
 from collections import defaultdict
+from sklearn.cluster import KMeans
 import matplotlib.pyplot as plt
 import math
 import pandas as pd
@@ -34,7 +35,7 @@ os.listdir(".")
 
 filename = 'Frases.txt'
 
-
+#### Limpieza
 data = [line.rstrip() for line in io.open(filename) if line.strip()]
 charstosub = pd.DataFrame(zip([u'á', u'é', u'í', u'ó', u'ú',u'"',u'“',u'”',u',',u'\.',u'ñ',u'\!',u'\¡'],[u'a', u'e', u'i', u'o', u'u',u'',u'',u'',u'',u'',u'n',u'',u''])) 
 
@@ -53,6 +54,7 @@ key_word = [line.split('\t')[1] for line in data]
 corpus = pd.DataFrame(zip(data_short,key_word))
 corpus.columns = ['oracion','clave']
 
+#### Representacion Vectorial
 list(corpus['oracion'])
 sentences = list([line.split() for line in list(corpus['oracion'])])
 model = gensim.models.Word2Vec(sentences, min_count=0, size=2, window=4)
@@ -60,14 +62,30 @@ words = model.vocab.keys()
 for line in words:
     print line
 vectors = [model[word] for word in model.vocab]
-rep_vect = pd.concat([pd.DataFrame(words),pd.DataFrame(vectors)],axis=1)
-rep_vect.columns = ['word','vec1','vec2']
+rep_vect = pd.DataFrame(vectors,index=words)
+rep_vect.columns = ['vec1','vec2']
 
-plot_words(rep_vect[['vec1','vec2']].as_matrix(),words)
+plot_words(rep_vect.as_matrix(),words)
 
+##### Funcion Suma
+rep_vect_doc_sum = np.full((len(corpus.index),len(rep_vect.columns)),0.0, dtype=np.double)
+for line in range(len(sentences)):
+    #print line, sentences[line]
+    
+    for word in range(len(sentences[line])):
+        #print word, sentences[line][word]
+        for coord in range(len(rep_vect.columns)):
+            rep_vect_doc_sum[line][coord] += rep_vect.loc[sentences[line][word]][coord]
+ 
+plot_words(rep_vect_doc_sum,list(corpus['oracion']))
 
+corpus['clave'].value_counts()
+corpus['clave'].value_counts().count()
 
-
-
-
-
+#### Clustering
+nclusters = 21
+modelo_cluster = KMeans(n_clusters=nclusters)
+modelo_cluster.fit(rep_vect_doc_sum)
+labels = modelo_cluster.labels_
+eval_final = pd.concat([corpus,pd.DataFrame(labels),pd.DataFrame(rep_vect_doc_sum)],axis=1)
+eval_final.to_csv('modelo_final.csv',encoding='utf-8',index=False)
